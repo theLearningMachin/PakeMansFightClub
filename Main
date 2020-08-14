@@ -1,0 +1,47 @@
+from tool import *
+import pokes
+
+
+input("\nWelcome to PakeManzFightClub!!\n\nThis is a simulation based on the game Pokemon by GameFreak and Nintendo\
+ the names and types used are not my creation, the AI and fighting system is. This is not at all anything like \
+pokemon.\n\nENTER")
+
+
+main = True
+while main:
+  clear()
+  print_offs = ["Fight - begin simulating pokemon battles", \
+  "Predict - show the next team of three that would be chosen", \
+  "Reset - reset all variables to a chosen number", "Quit - quit the game"]
+  options = ['fight', 'predict', 'quit', 'reset']
+  print("\nOPTIONS: ")
+  for i in print_offs:
+    print("   "+i)
+  user= input("\nEntry:  ").lower().replace(' ', '')
+  
+  if user == 'fight':
+    import pokes
+    predict = pokes.training()
+    save_to_json('prediction', predict)
+  
+  if user == 'quit':
+    break
+  
+  if user == 'predict':
+    import pokes
+    pokes.generate()
+    clear()
+  
+  if user == 'reset':
+    weights = load_json('pokeweights')
+    x = input("\nWhat would you like to set the variables to?\n(Recommended: 100)\n\nEntry: ")
+    weights = nested_set_all(weights, int(x))
+    save_to_json('pokeweights', weights)
+    clear()
+  
+  if user not in options:
+    print("\nThat isn't a valid input, please try again")
+    wait(2)
+    clear()
+    
+
