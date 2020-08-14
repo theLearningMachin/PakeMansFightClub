@@ -1,0 +1,372 @@
+from tool import *
+
+types = ['normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison', 'ground',\
+'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy']
+
+def evaluate(inputs, weights):
+  from random import choice
+  result = {}
+  best = ''
+  for i in inputs:
+    layer = int(round(inputs[i] * weights[i]))
+    result[i] = layer
+  for key in result:
+    try:
+      if result[key] > result[best]:
+        best = key
+      if result[key] == result[best]:
+        x = [best, key]
+        best = choice(x)
+    except KeyError:
+      best = key
+  return best
+
+
+def nested_evaluate(inputs, weights):
+  from random import choice
+  result = {}
+  bestone = ''
+  besttwo = ''
+  best = 0
+  for dictionary in inputs:
+    result[dictionary] = dict()
+    for i in inputs[dictionary]:
+      input_var = safeget(inputs, dictionary, i)
+      weight_var = safeget(weights, dictionary, i)
+      layer = (input_var * weight_var)
+      (result[dictionary])[i] = layer
+  for dictionary in result:
+    temp = result[dictionary]
+    for i in temp:
+      if temp[i] > best:
+        best = temp[i]
+        bestone = dictionary
+        besttwo = i
+      if temp[i] == best:
+        x = [True, False]
+        if choice(x):
+          best = temp[i]
+          bestone = dictionary
+          besttwo = i
+  return bestone, besttwo
+
+
+def punish(choice, weights):
+  for key, val in weights.items():
+    x = weights[key]
+    if key == choice:
+      weights[key] -= float((2/41)*(x))
+  return weights
+
+
+def reward(choice, weights):
+  for key, val in weights.items():
+    x = weights[key]
+    if key == choice:
+      weights[key] += float((1/41)*(x))
+  return weights
+
+
+def nested_punishment(weights, first_arg, sec_arg):
+  from math import log
+  try:
+    x = (((weights[first_arg])[sec_arg])-10)/3
+    (weights[first_arg])[sec_arg] = (log(x, 10)*50)
+  except KeyError:
+    x = (((weights[first_arg])[sec_arg])-10)/3
+    (weights[sec_arg])[first_arg] = (log(x, 10)*50)
+  except ValueError:
+    x = 20
+    (weights[first_arg])[sec_arg] = (log(x, 10)*50)
+  return weights
+
+
+def nested_reward(weights, first_arg, sec_arg):
+  from math import log
+  try:
+    x = (((weights[first_arg])[sec_arg])+20)/3
+    (weights[first_arg])[sec_arg] = (log(x, 10)*50)
+  except KeyError:
+    x = (((weights[first_arg])[sec_arg])+20)/3
+    (weights[sec_arg])[first_arg] = (log(x, 10)*50)
+  return weights
+
+
+class Monster:
+  def __init__(self, kindone, kindtwo):
+    self.self = self
+    self.kindone = kindone
+    self.kindtwo = kindtwo
+  
+  def is_dead(self):
+    if self.hp < 1:
+      return True
+    return False
+
+
+def computer_choice(inputs, weights):
+  cputeam=[]
+  choice = True
+  while choice:
+    bestone, besttwo = (nested_evaluate(inputs, weights))
+    inputs[bestone].pop(besttwo)
+    weights[bestone].pop(besttwo)
+    best = Monster(kindone=bestone, kindtwo=besttwo)
+    cputeam.append(best)
+    if len(cputeam) == 3:
+      return cputeam
+
+
+def training():
+  import random
+  generation = {
+    'user': 0,
+    'cpu': 0,
+    'draw': 0
+  }
+  userwins=0
+  cpuwins=0
+  gendraw=0
+  session = {
+    'user': 0,
+    'cpu': 0,
+    'draw': 0,
+    'userlong': 0,
+    'cpulong': 0,
+    'userlong': 0,
+    'total': 0,
+    'run': 0,
+    'length': 0,
+    'memory': []
+  }
+  
+  new_team = True
+  battle = True
+  while battle:
+    
+    if new_team:
+      types_input = load_json('pokeinput')
+      types_weights = load_json('pokeweights')
+      
+      cputeam = computer_choice(types_input, types_weights)
+      
+      types_input = load_json('pokeinput')
+      types_weights = load_json('pokeweights')
+      
+      typology = []
+      for i in cputeam:
+        if i.kindone not in typology:
+          typology.append(i.kindone)
+        if i.kindtwo not in typology:
+          typology.append(i.kindtwo)
+        if i.kindone in typology:
+          types_weights = nested_punishment(types_weights, i.kindone, i.kindtwo)
+        if i.kindtwo in typology:
+          types_weights = nested_punishment(types_weights, i.kindone, i.kindtwo)
+      save_to_json('pokeweights', types_weights)
+      new_team = False
+    
+    userteam = []
+    teamselect = True
+    while teamselect:
+      from dictionaries import user_poss as up
+      from random import randint
+      x = len(up) - 1
+      bud = up[randint(0, x)]
+      bud = bud.split('/')
+      first = bud[0]
+      second = bud[1]
+      userteam.append(Monster(kindone=first, kindtwo=second))
+      
+      if len(userteam) == 3:
+        break
+    
+    from dictionaries import damage_strings as DS
+    
+    userscore = 0
+    cpuscore = 0
+    for cpu in cputeam:
+      usertemp = 0
+      cputemp = 0
+      for bud in userteam:
+        try:
+          damage_string_cpu = safeget(DS, bud.kindone, bud.kindtwo)
+        except KeyError:
+          damage_String_cpu = safeget(DS, bud.kindtwo, bud.kindone)
+        try:
+          damage_string_user = safeget(DS, cpu.kindone, cpu.kindtwo)
+        except KeyError:
+          damage_string_user = safeget(DS, cpu.kindtwo, cpu.kindone)
+        for kind in types:
+          i = types.index(kind)
+          try:
+            if kind == cpu.kindone:
+              cputemp += (int(damage_string_cpu[i]))
+            if kind == cpu.kindtwo:
+              cputemp += (int(damage_string_cpu[i]))
+            if kind == bud.kindone:
+              usertemp += (int(damage_string_user[i]))
+            if kind == bud.kindtwo:
+              usertemp += (int(damage_string_user[i]))
+          except IndexError:
+            pass
+      
+        types_input = load_json('pokeinput')
+        types_weights = load_json('pokeweights')
+        
+        if usertemp == cputemp:
+          pass
+        
+        if usertemp > cputemp:
+          types_weights = nested_punishment(types_weights, cpu.kindone, cpu.kindtwo)
+        
+        if usertemp < cputemp:
+          types_weights = nested_reward(types_weights, cpu.kindone, cpu.kindtwo)
+        
+        save_to_json('pokeweights', types_weights)
+        userscore += usertemp
+        cpuscore += cputemp
+    
+    types_input = load_json('pokeinput')
+    types_weights = load_json('pokeweights')
+    
+    if userscore == cpuscore:
+      generation['draw'] += 1
+    
+    if userscore > cpuscore:
+      generation['user'] += 1
+      for i in cputeam:
+        types_weights = nested_punishment(types_weights, i.kindone, i.kindtwo)
+    
+    if userscore < cpuscore:
+      generation['cpu'] += 1
+      for i in cputeam:
+        types_weights = nested_reward(types_weights, i.kindone, i.kindtwo)
+    
+    save_to_json('pokeweights', types_weights)
+    
+    session['run'] += 1
+    if session['run'] > 199:
+      
+      wait(1)
+      clear()
+      
+      memory = []
+      for i in cputeam:
+        temp = [i.kindone, i.kindtwo]
+        temp = sorted(temp)
+        memory.append("/".join(temp))
+      memory = sorted(memory)
+      memory = " ".join(memory)
+      session['memory'].append(memory)
+      if len(session['memory']) > 19:
+        session['memory'].pop(0)
+      
+      print("\nYour Team: "+(cputeam[0].kindone)+"/"+(cputeam[0].kindtwo)+", "+(cputeam[1].kindone)\
+      +"/"+(cputeam[1].kindtwo)+", "+(cputeam[2].kindone)+"/"+(cputeam[2].kindtwo))
+      print("\nGeneration Stats:\n   Losses: "+str(generation['user']))
+      print("   Wins: "+str(generation['cpu'])+"\n   Draws: "+str(generation['draw']))
+      
+      if generation['user'] > generation['cpu']:
+        session['user'] += 1
+        for i in cputeam:
+          types_weights = nested_punishment(types_weights, i.kindone, i.kindtwo)
+      if generation['cpu'] > generation['user']:
+        session['cpu'] += 1
+        session['cpulong'] += 1
+      if generation['cpu'] == generation['user']:
+        session['draw'] += 1
+      
+      session['total'] += 1
+      
+      try:
+        confidence = ((session['cpu'] / session['total'])*100)
+      except ZeroDivisionError:
+        confidence = 0
+      
+      if session['total'] > 9:
+        if confidence < 60:
+          temp_dict = {}
+          for i in session['memory']:
+            try:
+              temp_dict[i] += 1
+            except KeyError:
+              temp_dict[i] = 0
+          if temp_dict[max(temp_dict)] > (len(session['memory'])/2):
+            for i in cputeam:
+              types_weights = nested_punishment(types_weights, i.kindone, i.kindtwo)
+            session['total'] = 0
+            session['user'] = 0
+            session['cpu'] = 0
+      
+      session['length'] += 1
+      print("\nSession Stats:\n   Losses since last reset: "+str(session['user'])+\
+      "\n   Wins since last reset: "+str(session['cpu']))
+      print("   Draws since last reset: "+str(session['draw']))
+      print("   Generations since last reset: "+str(session['total']))
+      print("   Session generations: "+str(session['length']))
+      print("   Session Success Rate: "+str(int((session['cpulong']/session['length'])*100))+"%")
+      save_to_json('pokeweights', types_weights)
+      print("\nPrevious Teams:")
+      prediction = []
+      for i in session['memory']:
+        if i not in prediction:
+          print("   "+i)
+          prediction.append(i)
+      
+      if session['total'] > 99:
+        if yes_no("\nAre you ready to quit?\n   Enemy Wins: "+str(session['user'])\
+        +"\n   Your Wins: "+str(session['cpu'])+"\nEntry: "):
+          return prediction
+        session['total'] = 0
+        session['user'] = 0
+        session['cpu'] = 0
+      
+      if session['total'] > 9:
+        if confidence > 70:
+          temp_dict = {}
+          for i in session['memory']:
+            try:
+              temp_dict[i] += 1
+            except KeyError:
+              temp_dict[i] = 0
+          if temp_dict[max(temp_dict)] > (len(session['memory'])/2):
+            conf = {}
+            for i in session['memory']:
+              if i not in conf:
+                conf[i] = 1
+              if i in conf:
+                conf[i] += 1
+            total = 0
+            for i in conf:
+              total += conf[i]
+            conf_var = conf[max(conf)]
+            conf_val = (conf_var/total)*100
+            possibility = (confidence+conf_val)/2
+            print("\nI am "+str(int(round(possibility)))+\
+            "% confident that this is the best possible team\n")
+            input("\nEnter to return to the main menu")
+            return prediction
+      
+      session['run'] = 0
+      new_team = True
+      for i in generation.keys():
+        generation[i] = 0
+      import gc
+      gc.collect()
+
+
+def generate():
+  prediction = load_json('prediction')
+  if len(prediction) >= 10:
+    print("I need to gather more data to make a prediction")
+  if len(prediction) < 10:
+    print("These are the most likely teams:")
+    for i in prediction:
+      print("   "+i)
+  input("\nEnter to continue")
+
+
+
+
+
